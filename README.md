@@ -10,3 +10,7 @@ recorded and to be followed for survival. Six of those cases were lost to follow
 diagnosis, so the data here are on an additional 106 cases as well as the 312 randomized participants.
 
 The dataset is found here (https://search.r-project.org/CRAN/refmans/merlin/html/pbc.html)
+
+CoxPH Model, LogNormal, LogLogistic, log-log plots, Weibull Model, Exponential Models were used in this analysis.
+
+Conclusion: There is no effect of the drug D-penicillamine on PBC Patients (it might even be leading to negative effects).
