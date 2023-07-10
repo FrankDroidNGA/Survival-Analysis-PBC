@@ -1,0 +1,367 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+#datset
+data(pbc, package="survival")
+
+head(pbc)
+```
+```{r}
+# Getting the 312 randomized participants
+pbc <- pbc
+```
+
+
+```{r}
+library(survival)
+Surv(pbc$time, pbc$status)
+
+# Simple Kaplan Meier plot
+
+mykm1 <- survfit(Surv(time, status) ~ 1, data = pbc)
+
+plot(mykm1, mark.time = TRUE)
+```
+```{r}
+library(VIM)
+mice_plot_1 <- aggr(pbc, col=c('navyblue','yellow'),
+                    numbers=TRUE, sortVars=TRUE,
+                    labels=names(pbc), cex.axis=.7,
+                    gap=3, ylab=c("missing data: pbc","Pattern"))
+```
+```{r}
+na_count <-sapply(pbc, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+```
+
+```{r}
+# Descriptive Stats
+str(pbc)
+
+summary(pbc)
+```
+```{r}
+by(pbc, pbc$status, summary)
+```
+
+```{r}
+by(pbc, pbc$trt, summary)
+```
+
+```{r}
+mosaicplot(table(pbc$sex, pbc$trt),
+  color = TRUE,
+  xlab = "Gender", # label for x-axis
+  ylab = "Size" # label for y-axis
+)
+```
+```{r}
+library(ggplot2)
+ggplot(pbc) +
+  aes(x = sex, y = age) +
+  geom_boxplot()
+```
+```{r}
+ggplot(pbc) +
+  aes(x = sex, y = time) +
+  geom_boxplot()
+```
+```{r}
+plot(pbc$time, pbc$platelet)
+plot(pbc$time, pbc$trt)
+```
+
+```{r}
+library(dplyr)
+data <- pbc
+
+
+data <- data %>%                        
+  mutate(    status = 
+               case_when(
+                 status == "0" ~ "censored",
+                 status == "1" ~ "transplant",
+                 status == "2" ~ "dead"
+               )
+  ) %>% 
+  select("time",     "status",   "trt",      "age" ,     "sex", "ascites" , "hepato" ,  "spiders" , "edema"  ,  "bili"  ,   "chol"  ,   "albumin" , "copper"  
+,"alk.phos", "ast"  ,    "trig"   ,  "platelet" ,"protime" , "stage" )
+
+```
+
+```{r}
+data <- data %>%                        
+  mutate(    status = 
+               case_when(
+                 status == "censored" ~ "0",
+                 status == "transplant" ~ "0",
+                 status == "dead" ~ "1"
+               )
+  ) %>% 
+  select("time",     "status",   "trt",      "age" ,     "sex", "ascites" , "hepato" ,  "spiders" , "edema"  ,  "bili"  ,   "chol"  ,   "albumin" , "copper"  
+,"alk.phos", "ast"  ,    "trig"   ,  "platelet" ,"protime" , "stage" )
+```
+
+```{r}
+# replace NA trt values
+library("tidyr")
+data <- data %>% mutate_at(3, ~replace_na(.,3))
+
+
+```
+
+
+```{r}
+# Handling the missing data: platelet , trig, chol, alk.phos
+
+# install.packages("mice")
+library(mice)
+md.pattern(data)
+# using the pmm algorithm (predictive mean matching)
+my_imp_1 = mice(data, m=5, method = "pmm")
+my_imp_1$imp$trig
+# the 3rd iteration is chosen, due to it's closeness to the mean
+data = complete(my_imp_1,5)
+summary(data)
+md.pattern(data)
+```
+
+
+```{r}
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+#survival object Surv(time,event) lub Surv(time1,time2,event,type)
+data$status <- as.integer(data$status) 
+attach(data)
+my.survival.object<-Surv(time,status)
+my.survival.object
+
+#kaplan-meier estimator
+fit<-survfit(my.survival.object ~ 1) #krzywa przezycia
+plot(fit, xlab = "Weeks", ylab="Survival")
+summary(fit)
+summary(fit)$surv     # returns the Kaplan-Meier estimate at each t_i
+summary(fit)$time     # {t_i}
+summary(fit)$n.risk   # {Y_i}
+summary(fit)$n.event  # {d_i}
+summary(fit)$std.err  # standard error of the K-M estimate at {t_i}
+summary(fit)$lower    # lower pointwise estimates (alternatively, $upper)
+str(fit)              # full summary of the fit object
+str(summary(fit))     # full summary of the fit object
+plot(fit, main="Kaplan-Meier estimate with 95% confidence bounds",
+     xlab="time", ylab="survival function")
+autoplot(fit)
+#graph
+plot(survfit(my.survival.object ~ 1), xlim=c(0, 6), xlab="weeks",
+     ylab="Estimated Survival Function",
+     main="Reproducing Confidence Bands for S(x)")
+
+
+```
+
+
+
+```{r}
+my.survival.object<-Surv(time,trt)
+my.survival.object
+
+#kaplan-meier estimator
+fit<-survfit(my.survival.object ~ 1) #krzywa przezycia
+plot(fit, xlab = "Weeks", ylab="Survival")
+summary(fit)
+summary(fit)$surv     # returns the Kaplan-Meier estimate at each t_i
+summary(fit)$time     # {t_i}
+summary(fit)$n.risk   # {Y_i}
+summary(fit)$n.event  # {d_i}
+summary(fit)$std.err  # standard error of the K-M estimate at {t_i}
+summary(fit)$lower    # lower pointwise estimates (alternatively, $upper)
+str(fit)              # full summary of the fit object
+str(summary(fit))     # full summary of the fit object
+plot(fit, main="Kaplan-Meier estimate with 95% confidence bounds",
+     xlab="time", ylab="survival function")
+
+#graph
+plot(survfit(my.survival.object ~ 1), xlim=c(0, 6), xlab="weeks",
+     ylab="Estimated Survival Function",
+     main="Reproducing Confidence Bands for S(x)")
+
+plot(survfit(my.survival.object ~ trt), xlab = "Weeks", ylab="Survival")
+my.fit1<-survfit(Surv(time, status) ~ trt)
+plot(my.fit1, xlab = "Weeks", ylab="Survival")
+
+autoplot(my.fit1)+scale_fill_discrete(name = "trt")
+
+#males vs Females
+my.fit2<-survfit(Surv(time, status) ~ sex)
+autoplot(my.fit2)+scale_fill_discrete(name = "Sex")
+
+# cancer stage
+my.fit3<-survfit(Surv(time, status) ~ stage)
+autoplot(my.fit3)+scale_fill_discrete(name = "stage")
+
+# edema stage
+my.fit4<-survfit(Surv(time, status) ~ edema)
+autoplot(my.fit4)+scale_fill_discrete(name = "edema")
+
+# age survival
+vet <- mutate(data, AG = ifelse((age < 50), "LT50", "OV50"))
+
+km_AG_fit <- survfit(Surv(time, status) ~ AG, data=vet)
+autoplot(km_AG_fit) +scale_fill_discrete(name = "age")
+```
+```{r}
+#Log-rank test 
+survdiff(Surv(time,status) ~ trt, data=data)
+survdiff(Surv(time,status) ~ sex, data=data)
+survdiff(Surv(time,status) ~ stage, data=data)
+survdiff(Surv(time,status) ~ edema, data=data)
+survdiff(Surv(time,status) ~ AG, data=vet)
+```
+
+
+```{r}
+# 3 Cox Proportional Hazards Model
+
+cox <- coxph(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet)
+summary(cox)
+
+cox_fit <- survfit(cox)
+autoplot(cox_fit)
+```
+
+```{r}
+aa_fit <-aareg(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet)
+aa_fit
+summary(aa_fit)
+autoplot(aa_fit)
+```
+
+```{r}
+# Checking the PH assumption
+
+res.cox <- coxph(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet)
+res.zph <- cox.zph(res.cox, transform = c("km","rank","identity")[2])
+
+## Print test results
+res.zph
+
+plot(res.zph)
+```
+
+```{r}
+plot(survfit(Surv(time, status) ~ trt, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log trt") 
+plot(survfit(Surv(time, status) ~ sex, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log sex") 
+plot(survfit(Surv(time, status) ~ ascites, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log ascites") 
+plot(survfit(Surv(time, status) ~ hepato, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log hepato")
+plot(survfit(Surv(time, status) ~ spiders, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log spiders") 
+plot(survfit(Surv(time, status) ~ edema, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log edema") 
+plot(survfit(Surv(time, status) ~ chol, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log chol") 
+plot(survfit(Surv(time, status) ~ albumin, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log alb") 
+plot(survfit(Surv(time, status) ~ trig, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log trig") 
+plot(survfit(Surv(time, status) ~ stage, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log stage")
+plot(survfit(Surv(time, status) ~ AG, data = vet), fun = "cloglog", xlab = "Time (in days) using log", ylab = "log-log survival", main = "log-log age") 
+```
+
+```{r}
+# Assessing the PH assumption using time-dependent covariates
+## Add id to indicate clusters
+vet$id <- as.numeric(rownames(vet))
+
+## Split a survival data set at specified times to form a counting process format
+vet.cp.format <- survSplit(data  = vet,
+                            cut   = c(7),       # cut at time 7
+                            end   = "time",    # original survival time
+                            event = "status",   # event indicator
+                            start = "start")    # will be created. zero by default
+
+## Somehow there are duplicated lines. Compeltely identical lines are deleted.
+vet.cp.format <- unique(vet.cp.format)
+
+## Recoding
+vet.cp.format <- within(vet.cp.format, {
+
+    ## Create new survival object
+    SurvObj <- Surv(start, time, status)
+
+    ## Create interval indicator
+    interval <- factor(start, levels = c(0,7), labels = c("First","Second"))
+})
+
+## Reordering
+vet.cp.format <- vet.cp.format[with(vet.cp.format, order(id, time)),]
+rownames(vet.cp.format) <- NULL
+head(vet.cp.format, 15)
+```
+
+```{r}
+## Fit extended Cox model with multiple interaction terms
+## cluster(id) for robutst SE to account for within-cluster non-independence
+res.extended.cox <- coxph(SurvObj ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG + trt:interval + sex:interval + ascites:interval + hepato:interval + spiders:interval + edema:interval + bili:interval + chol:interval + albumin:interval + copper:interval + alk.phos:interval + ast:interval + trig:interval + platelet:interval + protime:interval + stage:interval + AG:interval + cluster(id),
+                          data = vet.cp.format)
+summary(res.extended.cox)
+```
+
+```{r}
+## Testing the sex variable only
+## cluster(id) for robutst SE to account for within-cluster non-independence
+res.extended.cox <- coxph(SurvObj ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG +chol:interval + cluster(id),
+                          data = vet.cp.format)
+summary(res.extended.cox)
+```
+
+```{r}
+# Parametric PH and AFT models:
+
+#parametric model
+library(flexsurv)
+
+# Now we fit survival models 
+fit_weibull <- survreg(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet, dist = "weibull")
+summary(fit_weibull)
+fit_weibull$coeff    # covariate coefficients
+fit_weibull$var      # variance-covariance matrix
+fit_weibull$loglik   # log-likelihood
+fit_weibull$scale  
+
+fit_exp <- survreg(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet, dist = "exponential")
+summary(fit_exp)
+fit_exp$coeff    # covariate coefficients
+fit_exp$var      # variance-covariance matrix
+fit_exp$loglik   # log-likelihood
+fit_exp$scale   
+
+fit_ln <- survreg(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet, dist = "lognormal")
+summary(fit_ln)
+
+fit_lg <- survreg(Surv(time, status) ~ trt + sex + ascites + hepato + spiders + edema + bili + chol + albumin + copper + alk.phos + ast + trig + platelet + protime + stage + AG, data = vet, dist = "loglogistic")
+summary(fit_lg)
+```
+
+```{r}
+library(AICcmodavg)
+
+#define list of models
+models <- list(fit_weibull, fit_exp, fit_ln, fit_lg)
+
+#specify model names
+mod.names <- c('Weibull', 'Exponential', 'Lognormal', 'Loglogistic')
+
+#calculate AIC of each model
+aictab(cand.set = models, modnames = mod.names)
+```
+```{r}
+X <- cbind(trt , sex , ascites , hepato , spiders , edema , bili , chol , albumin , copper , alk.phos , ast , trig , platelet , protime , stage , age)
+weibull <- survreg(Surv(time,status) ~ X, dist="weibull")
+```
+
